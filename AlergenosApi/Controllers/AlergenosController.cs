@@ -74,7 +74,9 @@ namespace AlergenosApi.Controllers
                     Type = plato.Type
                 });
             }
-            return Ok(platos);
+            var platosOrdenados = platos.OrderBy(plato => plato.Description);
+            return Ok(platosOrdenados);
+            //return StatusCode(505);
         }
 
         // Método para recoger la información de un plato
@@ -132,6 +134,7 @@ namespace AlergenosApi.Controllers
                 }
             }
             return Ok(platos);
+            
         }
     }
 }
