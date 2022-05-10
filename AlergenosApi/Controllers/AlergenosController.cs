@@ -49,12 +49,12 @@ namespace AlergenosApi.Controllers
             {
                 List<AlergenosJSON> alergenosJSON = new();
                 if (plato.Allergens != null && plato.Allergens.Length > 0) {
-                    List<Alergenos> platoAlergenos = JsonSerializer.Deserialize<List<Alergenos>>(plato.Allergens)!;
-                    foreach (Alergenos alergeno in platoAlergenos)
+                    List<string> platoAlergenos = JsonSerializer.Deserialize<List<string>>(plato.Allergens)!;
+                    foreach (var alergeno in platoAlergenos)
                     {
-                        var esp = alergenosES.Find(x => x.RowKey == alergeno.Alergeno);
-                        var de = alergenosDE.Find(x => x.RowKey == alergeno.Alergeno);
-                        var en = alergenosEN.Find(x => x.RowKey == alergeno.Alergeno);
+                        var esp = alergenosES.Find(x => x.RowKey == alergeno);
+                        var de = alergenosDE.Find(x => x.RowKey == alergeno);
+                        var en = alergenosEN.Find(x => x.RowKey == alergeno);
                         alergenosJSON.Add(
                             new AlergenosJSON()
                             {
@@ -70,13 +70,12 @@ namespace AlergenosApi.Controllers
                 {
                     Allergens = alergenosJSON,
                     Item = plato.Item,
-                    Description = plato.Description,
+                    Description = plato.Description.Trim(),
                     Type = plato.Type
                 });
             }
             var platosOrdenados = platos.OrderBy(plato => plato.Description);
             return Ok(platosOrdenados);
-            //return StatusCode(505);
         }
 
         // Método para recoger la información de un plato
