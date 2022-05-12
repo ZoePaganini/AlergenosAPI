@@ -20,9 +20,10 @@ namespace AlergenosApi.Controllers
         [HttpGet("{hotel}")]
         public IActionResult GetPlatosHotel(string hotel)
         {
+            DateTime mesesAtras = DateTime.Now.AddMonths(-6);
             TableClient clientPlatos = new TableClient(connectionString, "ItemAllergens");
             TableClient clientAlergenos = new TableClient(connectionString, "Allergens");
-            Pageable<PlatoEntity> platosAPI = clientPlatos.Query<PlatoEntity>(filter: $"PartitionKey eq '{hotel}'");
+            Pageable<PlatoEntity> platosAPI = clientPlatos.Query<PlatoEntity>(filter: $"(PartitionKey eq {hotel} and Active eq true) or (PartitionKey eq {hotel} and Active eq false and Timestamp ge {mesesAtras})");
             Pageable<AlergenoEntity> alergenosAPI = clientAlergenos.Query<AlergenoEntity>();
             List<Plato> platos = new();
             List<AlergenoEntity> alergenosES = new();
@@ -84,7 +85,7 @@ namespace AlergenosApi.Controllers
         public IActionResult GetPlatos(string hotel, string nombre_plato)
         {
             TableClient client = new TableClient(connectionString, "Alergenos");
-            Pageable<PlatoEntity> entities = client.Query<PlatoEntity>(filter: $"Hotel eq {hotel}");
+            Pageable<PlatoEntity> entities = client.Query<PlatoEntity>(filter: $"PartitionKey eq {hotel}");
             List<Plato> platos = new();
             
             foreach (PlatoEntity plato in entities)
