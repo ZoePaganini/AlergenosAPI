@@ -21,9 +21,10 @@ namespace AlergenosApi.Controllers
         public IActionResult GetPlatosHotel(string hotel)
         {
             DateTime mesesAtras = DateTime.Now.AddMonths(-6);
+            string mesesTimeStamp = mesesAtras.ToString("yyyy-MM-ddTHH:mmZ");
             TableClient clientPlatos = new TableClient(connectionString, "ItemAllergens");
             TableClient clientAlergenos = new TableClient(connectionString, "Allergens");
-            Pageable<PlatoEntity> platosAPI = clientPlatos.Query<PlatoEntity>(filter: $"(PartitionKey eq {hotel} and Active eq true) or (PartitionKey eq {hotel} and Active eq false and Timestamp ge {mesesAtras})");
+            Pageable<PlatoEntity> platosAPI = clientPlatos.Query<PlatoEntity>(filter: $"(PartitionKey eq '{hotel}' and Active eq true) or (PartitionKey eq '{hotel}' and Active eq false and Timestamp ge datetime'{mesesTimeStamp}')");
             Pageable<AlergenoEntity> alergenosAPI = clientAlergenos.Query<AlergenoEntity>();
             List<Plato> platos = new();
             List<AlergenoEntity> alergenosES = new();
