@@ -1,5 +1,7 @@
 ﻿using Azure;
 using Azure.Data.Tables;
+using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 
@@ -12,18 +14,27 @@ namespace AlergenosApi.Controllers
     [ApiController]
     public class AlergenosController : ControllerBase
     {
+        private IConfiguration configuration;
+
+        public AlergenosController(IConfiguration iConfig)
+        {
+            configuration = iConfig;
+        }
         // Connection String
         private readonly string connectionString = "DefaultEndpointsProtocol=https;AccountName=dvldwvalidation;AccountKey=8CUxExiwJdLfvgTal8RQv1wQHmeazj1f36AzFtH3VsyiAV0JvSy+tdGPAix1lbnRj8ztiT+GSU+F3h1ryWCQRw==;BlobEndpoint=https://dvldwvalidation.blob.core.windows.net/;QueueEndpoint=https://dvldwvalidation.queue.core.windows.net/;TableEndpoint=https://dvldwvalidation.table.core.windows.net/;FileEndpoint=https://dvldwvalidation.file.core.windows.net/;";
 
         // Método para conseguir la información de todos los platos de un hotel, junto con los alérgenos
         // GET api/Alergenos/{hotel}
         [HttpGet("{hotel}")]
-        public IActionResult GetPlatosHotel(string hotel)
+        public async Task<IActionResult> GetPlatosHotel(string hotel)
         {
+            SecretClientOptions options = new() { Retry = { MaxRetries = 6, Delay = TimeSpan.FromSeconds(2), MaxDelay = TimeSpan.FromSeconds(16), Mode = Azure.Core.RetryMode.Exponential } };
+            SecretClient secretClient = new(new Uri(configuration.GetValue<string>("KeyVaultUrl")), new DefaultAzureCredential(), options);
+            KeyVaultSecret connectionString = await secretClient.GetSecretAsync("BDConnectionString");
             DateTime mesesAtras = DateTime.Now.AddMonths(-6);
             string mesesTimeStamp = mesesAtras.ToString("yyyy-MM-ddTHH:mmZ");
-            TableClient clientPlatos = new TableClient(connectionString, "ItemAllergens");
-            TableClient clientAlergenos = new TableClient(connectionString, "Allergens");
+            TableClient clientPlatos = new TableClient(connectionString.Value, "ItemAllergens");
+            TableClient clientAlergenos = new TableClient(connectionString.Value, "Allergens");
             Pageable<PlatoEntity> platosAPI = clientPlatos.Query<PlatoEntity>(filter: $"(PartitionKey eq '{hotel}' and Active eq true) or (PartitionKey eq '{hotel}' and Active eq false and Timestamp ge datetime'{mesesTimeStamp}')");
             Pageable<AlergenoEntity> alergenosAPI = clientAlergenos.Query<AlergenoEntity>();
             List<Plato> platos = new();
