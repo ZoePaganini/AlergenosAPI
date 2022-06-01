@@ -15,6 +15,7 @@ namespace AlergenosApi
         public string Type { get; set; }
         public bool Active { get; set; }
         public string? Allergens { get; set; }
+        public string TPV { get; set; }
         public ETag ETag { get; set; }
         DateTimeOffset? ITableEntity.Timestamp { get; set; }
 

@@ -15,41 +15,52 @@ namespace AlergenosApi.Controllers
     public class AlergenosController : ControllerBase
     {
         private IConfiguration configuration;
+        private string connectionString;
 
         public AlergenosController(IConfiguration iConfig)
         {
             configuration = iConfig;
+            SecretClientOptions options = new() { Retry = { MaxRetries = 6, Delay = TimeSpan.FromSeconds(2), MaxDelay = TimeSpan.FromSeconds(16), Mode = Azure.Core.RetryMode.Exponential } };
+            SecretClient secretClient = new(new Uri(configuration.GetValue<string>("KeyVaultUrl")), new DefaultAzureCredential(), options);
+            connectionString = secretClient.GetSecret("BDConnectionString").Value.Value;
         }
-        // Connection String
-        private readonly string connectionString = "DefaultEndpointsProtocol=https;AccountName=dvldwvalidation;AccountKey=8CUxExiwJdLfvgTal8RQv1wQHmeazj1f36AzFtH3VsyiAV0JvSy+tdGPAix1lbnRj8ztiT+GSU+F3h1ryWCQRw==;BlobEndpoint=https://dvldwvalidation.blob.core.windows.net/;QueueEndpoint=https://dvldwvalidation.queue.core.windows.net/;TableEndpoint=https://dvldwvalidation.table.core.windows.net/;FileEndpoint=https://dvldwvalidation.file.core.windows.net/;";
 
         // Método para conseguir la información de todos los platos de un hotel, junto con los alérgenos
         // GET api/Alergenos/{hotel}
         [HttpGet("{hotel}")]
         public async Task<IActionResult> GetPlatosHotel(string hotel)
         {
-            SecretClientOptions options = new() { Retry = { MaxRetries = 6, Delay = TimeSpan.FromSeconds(2), MaxDelay = TimeSpan.FromSeconds(16), Mode = Azure.Core.RetryMode.Exponential } };
-            SecretClient secretClient = new(new Uri(configuration.GetValue<string>("KeyVaultUrl")), new DefaultAzureCredential(), options);
-            KeyVaultSecret connectionString = await secretClient.GetSecretAsync("BDConnectionString");
             DateTime mesesAtras = DateTime.Now.AddMonths(-6);
             string mesesTimeStamp = mesesAtras.ToString("yyyy-MM-ddTHH:mmZ");
-            TableClient clientPlatos = new TableClient(connectionString.Value, "ItemAllergens");
-            TableClient clientAlergenos = new TableClient(connectionString.Value, "Allergens");
-            Pageable<PlatoEntity> platosAPI = clientPlatos.Query<PlatoEntity>(filter: $"(PartitionKey eq '{hotel}' and Active eq true) or (PartitionKey eq '{hotel}' and Active eq false and Timestamp ge datetime'{mesesTimeStamp}')");
+            TableClient clientPlatos = new TableClient(connectionString, "ItemAllergens");
+            TableClient clientAlergenos = new TableClient(connectionString, "Allergens");
+            TableClient clientTPVs = new TableClient(connectionString, "POS");
+            Pageable<PlatoEntity> platosAPI = clientPlatos.Query<PlatoEntity>(filter: $"(Hotel eq '{hotel}' and Active eq true) or (Hotel eq '{hotel}' and Active eq false and Timestamp ge datetime'{mesesTimeStamp}')");
             Pageable<AlergenoEntity> alergenosAPI = clientAlergenos.Query<AlergenoEntity>();
+            Pageable<TPVEntity> tpvsAPI = clientTPVs.Query<TPVEntity>(filter: $"Hotel eq '{hotel}'");
+            List<TPV> tpvs = new();
             List<Plato> platos = new();
             List<AlergenoEntity> alergenosES = new();
             List<AlergenoEntity> alergenosEN = new();
             List<AlergenoEntity> alergenosDE = new();
-            
+
+            foreach (TPVEntity p in tpvsAPI)
+            {
+                tpvs.Add(new TPV()
+                {
+                    Codigo = p.TPV,
+                    Descripcion = p.Descripcion,
+                });
+            }
+
             foreach (AlergenoEntity alergeno in alergenosAPI)
             {
-                switch(alergeno.PartitionKey)
+                switch (alergeno.PartitionKey)
                 {
-                    case "ES": 
+                    case "ES":
                         alergenosES.Add(alergeno);
                         break;
-                    case "DE": 
+                    case "DE":
                         alergenosDE.Add(alergeno);
                         break;
                     case "EN":
@@ -61,7 +72,8 @@ namespace AlergenosApi.Controllers
             foreach (PlatoEntity plato in platosAPI)
             {
                 List<AlergenosJSON> alergenosJSON = new();
-                if (plato.Allergens != null && plato.Allergens.Length > 0) {
+                if (plato.Allergens != null && plato.Allergens.Length > 0)
+                {
                     List<string> platoAlergenos = JsonSerializer.Deserialize<List<string>>(plato.Allergens)!;
                     foreach (var alergeno in platoAlergenos)
                     {
@@ -78,13 +90,17 @@ namespace AlergenosApi.Controllers
                             );
                     }
                 }
-                
+
+                var tpvDescription = tpvs.Find(tpv => tpv.Codigo!.Equals(plato.TPV));
+
+
                 platos.Add(new Plato()
                 {
                     Allergens = alergenosJSON,
                     Item = plato.Item,
                     Description = plato.Description.Trim(),
-                    Type = plato.Type
+                    Type = plato.Type,
+                    TPV = tpvDescription,
                 });
             }
             var platosOrdenados = platos.OrderBy(plato => plato.Description);
@@ -99,7 +115,7 @@ namespace AlergenosApi.Controllers
             TableClient client = new TableClient(connectionString, "Alergenos");
             Pageable<PlatoEntity> entities = client.Query<PlatoEntity>(filter: $"PartitionKey eq {hotel}");
             List<Plato> platos = new();
-            
+
             foreach (PlatoEntity plato in entities)
             {
                 if (plato.Description.ToLower().Contains(nombre_plato.ToLower()))
@@ -124,7 +140,7 @@ namespace AlergenosApi.Controllers
             TableClient client = new TableClient(connectionString, "Alergenos");
             Pageable<PlatoEntity> entities = client.Query<PlatoEntity>(filter: $"Hotel eq '{hotel}'");
             List<Plato> platos = new();
-            
+
             foreach (PlatoEntity plato in entities)
             {
                 List<Alergenos> alergenosList = (plato.Allergens != null) ? JsonSerializer.Deserialize<List<Alergenos>>(plato.Allergens) : null;
@@ -146,7 +162,7 @@ namespace AlergenosApi.Controllers
                 }
             }
             return Ok(platos);
-            
+
         }
     }
 }
