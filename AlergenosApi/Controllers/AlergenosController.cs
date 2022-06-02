@@ -107,6 +107,24 @@ namespace AlergenosApi.Controllers
             return Ok(platosOrdenados);
         }
 
+        //GET api/Alergenos/{hotel}/tpvs
+        [HttpGet("{hotel}/tpvs")]
+        public IActionResult GetTPVs(string hotel)
+        {
+            TableClient clientTPVs = new TableClient(connectionString, "POS");
+            Pageable<TPVEntity> tpvsAPI = clientTPVs.Query<TPVEntity>(filter: $"Hotel eq '{hotel}'");
+            List<TPV> tpvs = new();
+            foreach (TPVEntity p in tpvsAPI)
+            {
+                tpvs.Add(new TPV()
+                {
+                    Codigo = p.TPV,
+                    Descripcion = p.Descripcion,
+                });
+            }
+            return Ok(tpvs);
+        }
+
         // Método para recoger la información de un plato
         // GET api/Alergenos/{hotel}/plato/{nombre_plato}
         [HttpGet("{hotel}/plato/{nombre_plato}")]
